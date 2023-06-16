@@ -152,9 +152,9 @@ def generate_sparsity(metrics: _METRICS, target_spaces: _PRUNING_TARGET_SPACES) 
     update_masks = _generate_threshold_sparsity(metrics, threshold_target_spaces)
     _nested_multiply_update_masks(masks, _expand_masks(update_masks, threshold_target_spaces))
 
-    dependency_target_spaces, remained_target_spaces = target_spaces_filter(target_spaces, condition_dependency)
-    update_masks = _generate_dependency_sparsity(metrics, dependency_target_spaces)
-    _nested_multiply_update_masks(masks, _expand_masks(update_masks, dependency_target_spaces))
+    # dependency_target_spaces, remained_target_spaces = target_spaces_filter(target_spaces, condition_dependency)
+    # update_masks = _generate_dependency_sparsity(metrics, dependency_target_spaces)
+    # _nested_multiply_update_masks(masks, _expand_masks(update_masks, dependency_target_spaces))
 
     global_target_spaces, remained_target_spaces = target_spaces_filter(remained_target_spaces, condition_global)
     update_masks = _generate_global_sparsity(metrics, global_target_spaces)
