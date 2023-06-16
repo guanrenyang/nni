@@ -54,7 +54,7 @@ class LsqQuantizer(Quantizer):
         >>> optimizer = ...
         >>> dummy_input = torch.rand(...)
         >>> quantizer = LsqQuantizer(model, config_list, optimizer, dummy_input=dummy_input)
-        >>> quantizer.compress()
+        >>> quantizer.compress
         >>> # Training Process...
 
     For detailed example please refer to

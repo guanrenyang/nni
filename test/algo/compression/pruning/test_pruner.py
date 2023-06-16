@@ -37,7 +37,7 @@ def test_level_pruner(model_type: str):
 
     pruner = LevelPruner(model=model, config_list=config_list)
 
-    _, masks = pruner.compress()
+    _, masks = pruner.compress
     model(dummy_input)
     pruner._unwrap_model()
     validate_masks(masks, model, config_list)
@@ -58,7 +58,7 @@ def test_norm_pruner(model_type: str, pruning_type: str, mode: str):
     else:
         raise ValueError(f'wrong norm: {pruning_type}')
 
-    _, masks = pruner.compress()
+    _, masks = pruner.compress
     model(dummy_input)
     pruner._unwrap_model()
     validate_masks(masks, model, config_list)

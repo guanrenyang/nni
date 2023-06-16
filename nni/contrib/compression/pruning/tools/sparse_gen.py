@@ -11,14 +11,106 @@ from typing import Callable, Dict, List, Tuple
 import numpy
 import torch
 
-from .calculate_metrics import _METRICS
+from .calculate_metrics import _METRICS, _DYNAMIC_GRANULARITY_METRICS
 from ...base.compressor import _PRUNING_TARGET_SPACES
 from ...base.target_space import PruningTargetSpace, TargetType
 
 
 _MASKS = Dict[str, Dict[str, torch.Tensor]]
 
+def granularity_aware_generate_sparsity(metrics: _DYNAMIC_GRANULARITY_METRICS, target_spaces: _PRUNING_TARGET_SPACES) -> _MASKS:
+    def img2col_back_ward(mask, raw_shape):
+        return mask.reshape(raw_shape)
+    # def compare_pruning_unit(a, b):
+    #     # (granularity, layer, row_idx, block_idx, gran_threshold[elem[1], elem[2]])
+    #     gran_a, gran_b = a[0], b[0]
+    #     if (gran_a >= gran_b and a[4][gran_b] < b[4][gran_b]) or (gran_a < gran_b and a[4][gran_a] < b[4][gran_a]):
+    #         return -1
+    #     elif gran_a==gran_b and a[4][gran_a]==b[4][gran_b]:
+    #         return 0
+    #     else :
+    #         return 1
+    granularities: Dict[str, Dict[str, int]] = {'layer4.0.conv2': {'weight': 16}, 'layer4.1.conv1': {'weight': 16},\
+                                                 'layer3.0.conv2': {'weight': 16}, 'layer1.0.conv1': {'weight': 16}, \
+                                                    'layer2.0.conv2': {'weight': 16}, 'layer2.1.conv1': {'weight': 16}, \
+                                                        'layer4.0.downsample.0': {'weight': 16}, 'layer3.1.conv1': {'weight': 16}, \
+                                                            'layer2.0.downsample.0': {'weight': 16}, 'layer4.0.conv1': {'weight': 16},
+                                                              'layer4.1.conv2': {'weight': 16}, 'layer1.1.conv2': {'weight': 16}, 
+                                                              'layer1.1.conv1': {'weight': 16}, 'layer1.0.conv2': {'weight': 16}, 
+                                                              'layer2.0.conv1': {'weight': 16}, 'layer3.1.conv2': {'weight': 16}, 'conv1': {'weight': 16}, 
+                                                              'layer3.0.conv1': {'weight': 16}, 'layer3.0.downsample.0': {'weight': 16}, 'layer2.1.conv2': {'weight': 16}}
 
+    granularity_unaware_metric = defaultdict(dict)
+    for module_name, module_target_spaces in target_spaces.items():
+        for target_name, target_space in module_target_spaces.items():
+            if target_name == 'bias':
+                continue
+            granularity = granularities.get(module_name, {}).get(target_name, 16)
+            granularity_unaware_metric[module_name][target_name] = metrics[module_name][target_name][str(granularity)]
+
+            
+
+    group: List[Tuple[str, str, PruningTargetSpace]] = []
+    for module_name, ts in target_spaces.items():
+        for target_name, target_space in ts.items():
+            if target_name == 'weight':
+                group.append((module_name, target_name, target_space))  # type: ignore
+
+    masks = defaultdict(dict)
+    
+    group_sparse_ratio = None
+    for _, _, target_space in group:
+        if target_space.sparse_ratio is not None:
+            if group_sparse_ratio is None:
+                group_sparse_ratio = target_space.sparse_ratio
+            else:
+                assert group_sparse_ratio == target_space.sparse_ratio
+    assert group_sparse_ratio is not None
+
+    # at least how many elements to mask
+    sparse_number_low = 0
+    # at most how many elements to mask
+    sparse_number_high = 0
+    # how many elements in this group
+    total_element_number = 0
+    for _, _, target_space in group:
+        element_number = target_space.target.numel()  # type: ignore
+        total_element_number += element_number
+        sparse_number_low += int(element_number * target_space.min_sparse_ratio) if target_space.min_sparse_ratio else 0
+        sparse_number_high += int(element_number * target_space.max_sparse_ratio) if target_space.max_sparse_ratio else element_number
+    # how many elements should be masked, controlled by sparse_ratio
+    sparse_number = int(total_element_number * group_sparse_ratio)
+
+    # if sparse_number <= sparse_number_low:
+    #     # directly generate masks with target_space.min_sparse_ratio
+    #     for module_name, target_name, target_space in group:
+    #         sparse_ratio = target_space.min_sparse_ratio if target_space.min_sparse_ratio else 0.0
+    #         masks[module_name][target_name] = _ratio_mask(granularity_unaware_metric[module_name][target_name], sparse_ratio)
+    #         continue
+
+    # if sparse_number >= sparse_number_high:
+    #     # directly generate masks with target_space.max_sparse_ratio
+    #     for module_name, target_name, target_space in group:
+    #         sparse_ratio = target_space.max_sparse_ratio if target_space.max_sparse_ratio else 0.0
+    #         masks[module_name][target_name] = _ratio_mask(granularity_unaware_metric[module_name][target_name], sparse_ratio)
+    #         continue
+
+    sparse_threshold = _global_threshold_generate(granularity_unaware_metric, group, sparse_number)
+    for module_name, target_name, target_space in group:
+        granularity = granularities[module_name][target_name]
+        mask = _threshold_mask(granularity_unaware_metric[module_name][target_name], sparse_threshold)
+
+        shape = [1 for _ in mask.shape] + [granularity]
+        mask = mask.unsqueeze(-1).repeat(shape)
+        mask = mask.reshape((mask.shape[0], mask.shape[1] * mask.shape[2]))
+        
+        masks[module_name][target_name] = img2col_back_ward(mask, target_space.shape)
+
+        print(masks[module_name][target_name].shape, target_space.target.shape)
+        continue
+
+    return masks
+            
 def generate_sparsity(metrics: _METRICS, target_spaces: _PRUNING_TARGET_SPACES) -> _MASKS:
     """
     There are many ways to generate masks, in this function, most of the common generation rules are implemented,
@@ -27,7 +119,7 @@ def generate_sparsity(metrics: _METRICS, target_spaces: _PRUNING_TARGET_SPACES) 
     The following rules are included in this function:
 
         * Threshold. If sparse_threshold is set in target space, the mask will be generated by metric >= threshold is 1,
-        and metric < threshold is 0.
+        and metric < threshold is 0.ß
         * Dependency. If dependency_group_id is set in target space, the metrics of the targets in the same group will be
         meaned as the group metric, then if target_space.internal_metric_block is set, all internal_metric_block of the
         targets will be put in one set to compute the lcm as the group internal block number.

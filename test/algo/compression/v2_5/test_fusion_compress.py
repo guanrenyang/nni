@@ -58,4 +58,4 @@ def test_fusion_compress(model_type: str):
     config_list = config_list_dict['quantization']
     quantizer = LsqQuantizer.from_compressor(pruner, config_list)
 
-    quantizer.compress(100, None)
+    quantizer.compress

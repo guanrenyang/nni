@@ -156,7 +156,7 @@ config_list = [{
     'op_types': ['default']
 }]
 quantizer = PtqQuantizer(model, config_list, predict_func, True)
-quantizer.compress()
+quantizer.compress
 calibration_config = quantizer.export_model()
 print('quant result config: ', calibration_config)
 

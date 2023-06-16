@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 '''
-NNI example for supported fpgm pruning algorithms.
+NNI example for supported level pruning algorithm.
 In this example, we show the end-to-end pruning process: pre-training -> pruning -> fine-tuning.
 Note that pruners use masks to simulate the real pruning. In order to obtain a real compressed model, model speedup is required.
 
@@ -11,16 +11,14 @@ import argparse
 import sys
 
 import torch
-from torchvision import datasets, transforms
+from torchvision import datasets, transforms, models
 from torch.optim.lr_scheduler import MultiStepLR
 
-from nni.compression.pytorch import ModelSpeedup
 from nni.compression.pytorch.utils import count_flops_params
-from nni.compression.pytorch.pruning import FPGMPruner
+from nni.compression.pytorch.pruning import LevelPruner
 
 from pathlib import Path
-sys.path.append(str(Path(__file__).absolute().parents[1] / 'models'))
-from cifar10.vgg import VGG
+sys.path.append('/home/ryguan/nni/examples/model_compress/models')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
@@ -78,14 +76,15 @@ def optimizer_scheduler_generator(model, _lr=0.1, _momentum=0.9, _weight_decay=5
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch Example for model comporession')
-    parser.add_argument('--pretrain-epochs', type=int, default=20,
+    parser.add_argument('--pretrain-epochs', type=int, default=1,
                         help='number of epochs to pretrain the model')
-    parser.add_argument('--fine-tune-epochs', type=int, default=20,
+    parser.add_argument('--fine-tune-epochs', type=int, default=1,
                         help='number of epochs to fine tune the model')
     args = parser.parse_args()
 
     print('\n' + '=' * 50 + ' START TO TRAIN THE MODEL ' + '=' * 50)
-    model = VGG().to(device)
+    # model = VGG().to(device)
+    model = models.resnet18(pretrained=True).to(device)
     optimizer, scheduler = optimizer_scheduler_generator(model, total_epoch=args.pretrain_epochs)
     criterion = torch.nn.CrossEntropyLoss()
     pre_best_acc = 0.0
@@ -101,20 +100,19 @@ if __name__ == '__main__':
     print("Best accuracy: {}".format(pre_best_acc))
     model.load_state_dict(best_state_dict)
     pre_flops, pre_params, _ = count_flops_params(model, torch.randn([128, 3, 32, 32]).to(device))
-    g_epoch = 0
 
     # Start to prune and speedup
     print('\n' + '=' * 50 + ' START TO PRUNE THE BEST ACCURACY PRETRAINED MODEL ' + '=' * 50)
     config_list = [{
         'sparsity': 0.5,
-        'op_types': ['Conv2d']
+        'op_types': ['default']
     }]
-    pruner = FPGMPruner(model, config_list)
+    pruner = LevelPruner(model, config_list)
     _, masks = pruner.compress
     pruner.show_pruned_weights()
-    pruner._unwrap_model()
-    ModelSpeedup(model, dummy_input=torch.rand([10, 3, 32, 32]).to(device), masks_file=masks).speedup_model()
-    print('\n' + '=' * 50 + ' EVALUATE THE MODEL AFTER SPEEDUP ' + '=' * 50)
+
+    # Fine-grained method does not need to speedup
+    print('\n' + '=' * 50 + ' EVALUATE THE MODEL AFTER PRUNING ' + '=' * 50)
     evaluator(model)
 
     # Optimizer used in the pruner might be patched, so recommend to new an optimizer for fine-tuning stage.
@@ -122,6 +120,7 @@ if __name__ == '__main__':
     optimizer, scheduler = optimizer_scheduler_generator(model, _lr=0.01, total_epoch=args.fine_tune_epochs)
 
     best_acc = 0.0
+    g_epoch = 0
     for i in range(args.fine_tune_epochs):
         trainer(model, optimizer, criterion)
         scheduler.step()

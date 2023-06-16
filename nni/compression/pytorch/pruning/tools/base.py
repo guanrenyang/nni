@@ -32,7 +32,6 @@ def _get_scaler(scalers: Dict[str, Dict[str, Scaling]] | None, module_name: str,
     else:
         return None
 
-
 class DataCollector:
     """
     An abstract class for collect the data needed by the compressor.

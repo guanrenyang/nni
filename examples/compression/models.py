@@ -14,7 +14,7 @@ from torchvision.models.mobilenetv3 import mobilenet_v3_small
 from torchvision.models.resnet import resnet18
 
 import nni
-
+import tqdm
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -31,23 +31,67 @@ def build_resnet18():
 
 
 def prepare_dataloader(batch_size: int = 128):
-    normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-    train_loader = DataLoader(
-        datasets.CIFAR10(Path(__file__).parent / 'data', train=True, transform=transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomCrop(32, 4),
-            transforms.ToTensor(),
-            normalize,
-        ]), download=True),
-        batch_size=batch_size, shuffle=True, num_workers=8)
+    '''Image-net'''
+    import os
+    traindir = os.path.join('/localdata_ssd/imagenet', 'train')
+    valdir = os.path.join('/localdata_ssd/imagenet', 'val')
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
 
-    test_loader = DataLoader(
-        datasets.CIFAR10(Path(__file__).parent / 'data', train=False, transform=transforms.Compose([
+    train_dataset = datasets.ImageFolder(
+        traindir,
+        transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            normalize,
-        ])),
-        batch_size=batch_size, shuffle=False, num_workers=8)
-    return train_loader, test_loader
+            normalize
+        ])
+    )
+    val_dataset = datasets.ImageFolder(
+        valdir,
+        transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize
+        ])
+    )
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+        sampler=None
+    )
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=4,
+        pin_memory=True
+    )
+    return train_loader, val_loader
+
+    '''Cifar10'''
+    # normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    # train_loader = DataLoader(
+    #     datasets.CIFAR100(Path(__file__).parent / 'data', train=True, transform=transforms.Compose([
+    #         transforms.RandomHorizontalFlip(),
+    #         transforms.RandomCrop(32, 4),
+    #         transforms.ToTensor(),
+    #         normalize,
+    #     ]), download=True),
+    #     batch_size=batch_size, shuffle=True, num_workers=8)
+
+    # test_loader = DataLoader(
+    #     datasets.CIFAR100(Path(__file__).parent / 'data', train=False, transform=transforms.Compose([
+    #         transforms.ToTensor(),
+    #         normalize,
+    #     ])),
+    #     batch_size=batch_size, shuffle=False, num_workers=8)
+    # return train_loader, test_loader
 
 
 def prepare_optimizer(model: torch.nn.Module):
@@ -63,6 +107,7 @@ def train(model: torch.nn.Module, optimizer: torch.optim.Optimizer, training_ste
     max_steps = max_steps if max_steps else max_epochs * len(train_loader)
     max_epochs = max_steps // len(train_loader) + (0 if max_steps % len(train_loader) == 0 else 1)
     count_steps = 0
+    print_frequency = 1000
 
     model.train()
     for epoch in range(max_epochs):
@@ -72,20 +117,27 @@ def train(model: torch.nn.Module, optimizer: torch.optim.Optimizer, training_ste
             loss = training_step((data, target), model)
             loss.backward()
             optimizer.step()
+
+            if (count_steps + 0) % print_frequency == 0:
+                print('Evaluetion')
+                acc = evaluate(model, test_loader)
+                print(f'[Training step {count_steps} / Max step {max_steps}] Final Acc: {acc}%')
+
             count_steps += 1
+
             if count_steps >= max_steps:
                 acc = evaluate(model, test_loader)
                 print(f'[Training Epoch {epoch} / Step {count_steps}] Final Acc: {acc}%')
                 return
-        acc = evaluate(model, test_loader)
-        print(f'[Training Epoch {epoch} / Step {count_steps}] Final Acc: {acc}%')
+        # acc = evaluate(model, test_loader)
+        # print(f'[Training Epoch {epoch} / Step {count_steps}] Final Acc: {acc}%')
 
 
 def evaluate(model: torch.nn.Module, test_loader):
     model.eval()
     correct = 0.0
     with torch.no_grad():
-        for data, target in test_loader:
+        for data, target in tqdm.tqdm(test_loader):
             data, target = data.to(device), target.to(device)
             output = model(data)
             pred = output.argmax(dim=1, keepdim=True)

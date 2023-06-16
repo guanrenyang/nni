@@ -26,7 +26,7 @@ config_list = [{
 }]
 
 pruner = L1NormPruner(model, config_list)
-_, masks = pruner.compress()
+_, masks = pruner.compress
 pruner._unwrap_model()
 
 replacer = TransformersAttentionReplacer(model)

@@ -36,7 +36,7 @@ class PrunerTestCase(unittest.TestCase):
         conv2_weight = model.conv2.weight.data.clone()
         config_list = [{'op_types': ['Conv2d'], 'sparsity': 0.8}]
         pruner = L1NormPruner(model, config_list)
-        _, masks = pruner.compress()
+        _, masks = pruner.compress
         model(torch.rand(10, 1, 28, 28))
         assert torch.equal(model.conv1.weight.data, conv1_weight)
         assert torch.equal(model.conv2.weight.data, conv2_weight)

@@ -55,7 +55,7 @@ class SpeedupSoftmaxTestCase(unittest.TestCase):
         }]
 
         pruner = L1NormPruner(model=model, config_list=config_list)
-        _, masks = pruner.compress()
+        _, masks = pruner.compress
         pruner.show_pruned_weights()
         pruner._unwrap_model()  # unwrap all modules to normal state
 

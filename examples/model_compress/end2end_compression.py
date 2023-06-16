@@ -155,7 +155,7 @@ def main(args):
         kw_args['dummy_input'] = dummy_input
 
     pruner = L1FilterPruner(model, config_list, **kw_args)
-    model = pruner.compress()
+    model = pruner.compress
     pruner.get_pruned_weights()
 
     mask_path = os.path.join(args.experiment_data_dir, 'mask.pth')

@@ -63,7 +63,7 @@ class ObserverQuantizer(Quantizer):
         >>>         for data, _ in calib_loader:
         >>>             model(data)
         >>> calibration(model, calib_loader)
-        >>> quantizer.compress()
+        >>> quantizer.compress
 
     For detailed example please refer to
     :githublink:`examples/model_compress/quantization/observer_quantizer.py <examples/model_compress/quantization/observer_quantizer.py>`.

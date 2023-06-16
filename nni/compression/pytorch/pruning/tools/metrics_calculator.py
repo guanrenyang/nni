@@ -44,6 +44,7 @@ class NormMetricsCalculator(MetricsCalculator):
     def __init__(self, p: int | float | None = None, scalers: Dict[str, Dict[str, Scaling]] | Scaling | None = None):
         super().__init__(scalers=scalers)
         self.p = p if p is not None else 'fro'
+        
 
     def calculate_metrics(self, data: Dict[str, Dict[str, Tensor]]) -> Dict[str, Dict[str, Tensor]]:
         def reduce_func(t: Tensor) -> Tensor:

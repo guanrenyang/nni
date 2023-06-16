@@ -116,7 +116,7 @@ if __name__ == '__main__':
         pruner = L1NormPruner(model, config_list)
     else:
         pruner = L2NormPruner(model, config_list)
-    _, masks = pruner.compress()
+    _, masks = pruner.compress
     pruner.show_pruned_weights()
     pruner._unwrap_model()
     ModelSpeedup(model, dummy_input=torch.rand([10, 3, 32, 32]).to(device), masks_file=masks).speedup_model()

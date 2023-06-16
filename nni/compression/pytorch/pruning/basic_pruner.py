@@ -122,6 +122,7 @@ class BasicPruner(Pruner):
         """
         raise NotImplementedError()
 
+    @property
     def compress(self) -> Tuple[Module, Dict]:
         """
         Used to generate the mask. Pruning process is divided in three stages.
@@ -162,7 +163,8 @@ class EvaluatorBasedPruner(BasicPruner):
                         kwargs: Dict) -> Dict:
         # for fake __init__ overload, parsing args and kwargs, initializing evaluator or [trainer, traced_optimizer, criterion],
         # return the remaining arguments.
-        if (len(args) > 0 and isinstance(args[0], Evaluator)) or (len(args) == 0 and isinstance(kwargs.get('evaluator', None), Evaluator)):
+        if (len(args) > 0 and isinstance(args[0], Evaluator)) or (
+                len(args) == 0 and isinstance(kwargs.get('evaluator', None), Evaluator)):
             init_kwargs = self._parse_args(new_api, args, kwargs, init_kwargs)
             self.evaluator: Evaluator = init_kwargs.pop('evaluator')
             if not self.evaluator._initialization_complete:
@@ -197,11 +199,12 @@ class EvaluatorBasedPruner(BasicPruner):
             raise TypeError(f"{self.__class__.__name__}.__init__() got {len(diff)} unexpected keyword argument: {diff}")
         diff = set(arg_names).difference(merged_kwargs.keys())
         if diff:
-            raise TypeError(f"{self.__class__.__name__}.__init__() missing {len(diff)} required positional argument: {diff}")
+            raise TypeError(
+                f"{self.__class__.__name__}.__init__() missing {len(diff)} required positional argument: {diff}")
         return merged_kwargs
 
     def compress(self) -> Tuple[Module, Dict]:
-        result = super().compress()
+        result = super().compress
         if self.using_evaluator:
             self.evaluator.unbind_model()
         return result
@@ -274,13 +277,14 @@ class LevelPruner(BasicPruner):
         >>> from nni.compression.pytorch.pruning import LevelPruner
         >>> config_list = [{ 'sparsity': 0.8, 'op_types': ['default'] }]
         >>> pruner = LevelPruner(model, config_list)
-        >>> masked_model, masks = pruner.compress()
+        >>> masked_model, masks = pruner.compress
 
     For detailed example please refer to
     :githublink:`examples/model_compress/pruning/level_pruning_torch.py <examples/model_compress/pruning/level_pruning_torch.py>`
     """
 
-    def __init__(self, model: Module, config_list: List[Dict], mode: str = "normal", balance_gran: Optional[List] = None):
+    def __init__(self, model: Module, config_list: List[Dict], mode: str = "normal",
+                 balance_gran: Optional[List] = None):
         self.mode = mode
         self.balance_gran = balance_gran
         super().__init__(model, config_list)
@@ -305,6 +309,7 @@ class LevelPruner(BasicPruner):
                 self.sparsity_allocator = BankSparsityAllocator(self, self.balance_gran)
             else:
                 raise NotImplementedError('Only support mode `normal` and `balance`')
+
 
 class NormPruner(BasicPruner):
     """
@@ -366,6 +371,8 @@ class NormPruner(BasicPruner):
             self.data_collector.reset()
         if not hasattr(self, 'metrics_calculator'):
             self.metrics_calculator = NormMetricsCalculator(p=self.p, scalers=scalers)
+        
+        
 
 
 class L1NormPruner(NormPruner):
@@ -449,7 +456,7 @@ class L2NormPruner(NormPruner):
         >>> from nni.compression.pytorch.pruning import L2NormPruner
         >>> config_list = [{ 'sparsity': 0.8, 'op_types': ['Conv2d'] }]
         >>> pruner = L2NormPruner(model, config_list)
-        >>> masked_model, masks = pruner.compress()
+        >>> masked_model, masks = pruner.compress
 
     For detailed example please refer to
     :githublink:`examples/model_compress/pruning/norm_pruning_torch.py <examples/model_compress/pruning/norm_pruning_torch.py>`
@@ -501,7 +508,7 @@ class FPGMPruner(BasicPruner):
         >>> from nni.compression.pytorch.pruning import FPGMPruner
         >>> config_list = [{ 'sparsity': 0.8, 'op_types': ['Conv2d'] }]
         >>> pruner = FPGMPruner(model, config_list)
-        >>> masked_model, masks = pruner.compress()
+        >>> masked_model, masks = pruner.compress
 
     For detailed example please refer to
     :githublink:`examples/model_compress/pruning/fpgm_pruning_torch.py <examples/model_compress/pruning/fpgm_pruning_torch.py>`
@@ -596,7 +603,8 @@ class SlimPruner(EvaluatorBasedPruner):
         init_kwargs = {'scale': 0.0001, 'mode': 'global'}
         init_kwargs = self._init_evaluator(model, new_api, old_api, init_kwargs, args, kwargs)
 
-        self.training_epochs, self._scale, self.mode = init_kwargs['training_epochs'], init_kwargs['scale'], init_kwargs['mode']
+        self.training_epochs, self._scale, self.mode = init_kwargs['training_epochs'], init_kwargs['scale'], \
+        init_kwargs['mode']
 
         super().__init__(model, config_list)
 
@@ -626,6 +634,7 @@ class SlimPruner(EvaluatorBasedPruner):
             for wrapper in self.get_modules_wrapper().values():
                 sum_l1 += torch.norm(wrapper.weight, p=1)  # type: ignore
             return criterion(input_tensor, target) + self._scale * sum_l1
+
         return patched_criterion
 
     def loss_patch(self, origin_loss: Tensor):
@@ -642,14 +651,17 @@ class SlimPruner(EvaluatorBasedPruner):
             self.evaluator.unbind_model()
             self.evaluator.bind_model(self.bound_model, self.get_origin2wrapped_parameter_name_map())  # type: ignore
             if not hasattr(self, 'data_collector'):
-                self.data_collector = EvaluatorBasedTargetDataCollector(self, self.evaluator, loss_patch=self.loss_patch,
+                self.data_collector = EvaluatorBasedTargetDataCollector(self, self.evaluator,
+                                                                        loss_patch=self.loss_patch,
                                                                         max_epochs=self.training_epochs)
             else:
                 self.data_collector.reset(loss_patch=self.loss_patch)
         else:
             if not hasattr(self, 'data_collector'):
-                self.data_collector = WeightTrainerBasedDataCollector(self, self.trainer, self.optimizer_helper, self.criterion,
-                                                                      self.training_epochs, criterion_patch=self.criterion_patch)
+                self.data_collector = WeightTrainerBasedDataCollector(self, self.trainer, self.optimizer_helper,
+                                                                      self.criterion,
+                                                                      self.training_epochs,
+                                                                      criterion_patch=self.criterion_patch)
             else:
                 self.data_collector.reset()
 
@@ -760,6 +772,7 @@ class ActivationPruner(EvaluatorBasedPruner):
             if buffer[0] < self.training_steps:
                 buffer[1] += activation.to(buffer[1].device)  # type: ignore
                 buffer[0] += batch_num
+
         return collect_activation
 
     def _activation_trans(self, output: Tensor, dim: int | list = 0) -> Tensor:
@@ -792,7 +805,8 @@ class ActivationPruner(EvaluatorBasedPruner):
             collector_info = HookCollectorInfo([layer_info for layer_info, _ in self._detect_modules_to_compress()],
                                                'forward', self._collector)
             if not hasattr(self, 'data_collector'):
-                self.data_collector = SingleHookTrainerBasedDataCollector(self, self.trainer, self.optimizer_helper, self.criterion,
+                self.data_collector = SingleHookTrainerBasedDataCollector(self, self.trainer, self.optimizer_helper,
+                                                                          self.criterion,
                                                                           1, collector_infos=[collector_info])
             else:
                 self.data_collector.reset([collector_info])  # type: ignore
@@ -983,7 +997,8 @@ class TaylorFOWeightPruner(EvaluatorBasedPruner):
 
     @overload
     def __init__(self, model: Module, config_list: List[Dict], trainer: _LEGACY_TRAINER, traced_optimizer: Optimizer,
-                 criterion: _LEGACY_CRITERION, training_batches: int, mode: str = 'normal', dummy_input: Optional[Tensor] = None):
+                 criterion: _LEGACY_CRITERION, training_batches: int, mode: str = 'normal',
+                 dummy_input: Optional[Tensor] = None):
         ...
 
     def __init__(self, model: Module, config_list: List[Dict], *args, **kwargs):
@@ -1028,6 +1043,7 @@ class TaylorFOWeightPruner(EvaluatorBasedPruner):
             if buffer[0] < self.training_steps:
                 buffer[1] += self._calculate_taylor_expansion(weight_tensor, grad)
                 buffer[0] += 1
+
         return collect_taylor
 
     def _calculate_taylor_expansion(self, weight_tensor: Tensor, grad: Tensor) -> Tensor:
@@ -1054,17 +1070,20 @@ class TaylorFOWeightPruner(EvaluatorBasedPruner):
                 target_name = 'weight'
                 target = getattr(wrapper, target_name)
                 tensor_hooks[module_name] = {target_name: TensorHook(target, module_name,
-                                                                     functools.partial(self._collector, weight_tensor=target))}
+                                                                     functools.partial(self._collector,
+                                                                                       weight_tensor=target))}
             if not hasattr(self, 'data_collector'):
                 self.data_collector = EvaluatorBasedHookDataCollector(self, self.evaluator, hooks=tensor_hooks,
                                                                       max_steps=self.training_steps)
             else:
                 self.data_collector.reset(hooks=tensor_hooks)
         else:
-            hook_targets = {name: wrapper.weight for name, wrapper in self.get_modules_wrapper().items()}  # type: ignore
+            hook_targets = {name: wrapper.weight for name, wrapper in
+                            self.get_modules_wrapper().items()}  # type: ignore
             collector_info = HookCollectorInfo(hook_targets, 'tensor', self._collector)  # type: ignore
             if not hasattr(self, 'data_collector'):
-                self.data_collector = SingleHookTrainerBasedDataCollector(self, self.trainer, self.optimizer_helper, self.criterion,
+                self.data_collector = SingleHookTrainerBasedDataCollector(self, self.trainer, self.optimizer_helper,
+                                                                          self.criterion,
                                                                           1, collector_infos=[collector_info])
             else:
                 self.data_collector.reset([collector_info])  # type: ignore
@@ -1170,8 +1189,10 @@ class ADMMPruner(EvaluatorBasedPruner):
                 rho = wrapper.config.get('rho', 1e-4)
                 self.Z[name]['weight'] = self.Z[name]['weight'].to(wrapper.weight.device)  # type: ignore
                 self.U[name]['weight'] = self.U[name]['weight'].to(wrapper.weight.device)  # type: ignore
-                penalty += (rho / 2) * torch.sqrt(torch.norm(wrapper.weight - self.Z[name]['weight'] + self.U[name]['weight']))
+                penalty += (rho / 2) * torch.sqrt(
+                    torch.norm(wrapper.weight - self.Z[name]['weight'] + self.U[name]['weight']))
             return origin_criterion(output, target) + penalty
+
         return patched_criterion
 
     def loss_patch(self, origin_loss: Tensor):
@@ -1180,7 +1201,8 @@ class ADMMPruner(EvaluatorBasedPruner):
             rho = wrapper.config.get('rho', 1e-4)
             self.Z[name]['weight'] = self.Z[name]['weight'].to(wrapper.weight.device)  # type: ignore
             self.U[name]['weight'] = self.U[name]['weight'].to(wrapper.weight.device)  # type: ignore
-            penalty += (rho / 2) * torch.sqrt(torch.norm(wrapper.weight - self.Z[name]['weight'] + self.U[name]['weight']))
+            penalty += (rho / 2) * torch.sqrt(
+                torch.norm(wrapper.weight - self.Z[name]['weight'] + self.U[name]['weight']))
         return origin_loss + penalty
 
     def reset_tools(self):
@@ -1189,26 +1211,31 @@ class ADMMPruner(EvaluatorBasedPruner):
             self.evaluator.unbind_model()
             self.evaluator.bind_model(self.bound_model, self.get_origin2wrapped_parameter_name_map())  # type: ignore
             if not hasattr(self, 'data_collector'):
-                self.data_collector = EvaluatorBasedTargetDataCollector(self, self.evaluator, loss_patch=self.loss_patch,
+                self.data_collector = EvaluatorBasedTargetDataCollector(self, self.evaluator,
+                                                                        loss_patch=self.loss_patch,
                                                                         max_epochs=self.training_epochs)
             else:
                 self.data_collector.reset(loss_patch=self.loss_patch)
         else:
             if not hasattr(self, 'data_collector'):
-                self.data_collector = WeightTrainerBasedDataCollector(self, self.trainer, self.optimizer_helper, self.criterion,
-                                                                      self.training_epochs, criterion_patch=self.criterion_patch)
+                self.data_collector = WeightTrainerBasedDataCollector(self, self.trainer, self.optimizer_helper,
+                                                                      self.criterion,
+                                                                      self.training_epochs,
+                                                                      criterion_patch=self.criterion_patch)
             else:
                 self.data_collector.reset()
         if not hasattr(self, 'metrics_calculator'):
             if self.granularity == 'fine-grained':
                 self.metrics_calculator = NormMetricsCalculator(p=1)
             elif self.granularity == 'coarse-grained':
-                self.metrics_calculator = NormMetricsCalculator(p=1, scalers=Scaling(kernel_size=[1], kernel_padding_mode='back'))
+                self.metrics_calculator = NormMetricsCalculator(p=1, scalers=Scaling(kernel_size=[1],
+                                                                                     kernel_padding_mode='back'))
         if not hasattr(self, 'sparsity_allocator'):
             if self.granularity == 'fine-grained':
                 self.sparsity_allocator = NormalSparsityAllocator(self)
             elif self.granularity == 'coarse-grained':
-                self.sparsity_allocator = NormalSparsityAllocator(self, Scaling(kernel_size=[1], kernel_padding_mode='back'))
+                self.sparsity_allocator = NormalSparsityAllocator(self,
+                                                                  Scaling(kernel_size=[1], kernel_padding_mode='back'))
 
     def compress(self) -> Tuple[Module, Dict]:
         assert self.bound_model is not None
@@ -1241,3 +1268,36 @@ class ADMMPruner(EvaluatorBasedPruner):
             self.evaluator.unbind_model()
 
         return self.bound_model, masks
+
+
+class DynamicGranularityPruner(BasicPruner):
+    def __init__(self, model: Module, config_list: List[Dict], p: int,
+                 mode: str  = 'normal', dummy_input: Optional[Tensor] = None):
+        self.p = p
+        self.mode = mode
+        self.dummy_input = dummy_input
+
+        self.scalers: Dict[str, Dict[str, Scaling]] = None # TODO: spacify scalers for each target
+        super().__init__(model, config_list)
+
+
+    def _validate_config_before_canonical(self, model: Module, config_list: List[Dict]):
+        schema_list = [deepcopy(NORMAL_SCHEMA), deepcopy(EXCLUDE_SCHEMA), deepcopy(INTERNAL_SCHEMA)]
+        for sub_shcema in schema_list:
+            sub_shcema[SchemaOptional('op_types')] = ['Conv2d', 'Linear']
+        schema = CompressorSchema(schema_list, model, _logger)
+
+        schema.validate(config_list)
+
+    def reset_tools(self):
+        # scalers should be in type Dict[str, Dict[str, Scaling]],
+        # to specify a granularity to each tensor to be pruned
+        if not hasattr(self, 'sparsity_allocator'):
+            self.sparsity_allocator = NormalSparsityAllocator(self, self.scalers)
+        if not hasattr(self, 'data_collector'):
+            self.data_collector = TargetDataCollector(self)
+        else:
+            self.data_collector.reset()
+        if not hasattr(self, 'metrics_calculator'):
+            self.metrics_calculator = NormMetricsCalculator(p=2, scalers=self.scalers)
+

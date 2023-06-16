@@ -78,7 +78,7 @@ if __name__ == '__main__':
     distiller = DynamicLayerwiseDistiller.from_compressor(scheduled_pruner, config_list, teacher_model, teacher_predict, 0.1)
 
     # max_steps contains (30 iterations 100 steps agp taylor pruning, and 3000 steps finetuning)
-    distiller.compress(max_steps=100 * 60, max_epochs=None)
+    distiller.compress
     distiller.unwrap_model()
     distiller.unwrap_teacher_model()
 

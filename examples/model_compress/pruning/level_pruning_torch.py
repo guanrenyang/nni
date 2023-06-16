@@ -19,6 +19,8 @@ from nni.compression.pytorch.pruning import LevelPruner
 
 from pathlib import Path
 sys.path.append(str(Path(__file__).absolute().parents[1] / 'models'))
+print(str(Path(__file__).absolute().parents[1] / 'models'))
+input()
 from cifar10.vgg import VGG
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -108,7 +110,7 @@ if __name__ == '__main__':
         'op_types': ['default']
     }]
     pruner = LevelPruner(model, config_list)
-    _, masks = pruner.compress()
+    _, masks = pruner.compress
     pruner.show_pruned_weights()
 
     # Fine-grained method does not need to speedup

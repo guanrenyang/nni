@@ -56,7 +56,6 @@ class Compressor:
         self._is_wrapped = False
         self._module_wrappers, self._target_spaces = register_wrappers(self.bound_model, self.config_list, self.mode, existed_wrappers)
         self.wrap_model()
-
         self.fused_compressors = [self]
 
     @classmethod
@@ -201,6 +200,7 @@ class Pruner(Compressor):
         super().__init__(model=model, config_list=config_list, evaluator=evaluator, existed_wrappers=existed_wrappers)
         self._target_spaces: _PRUNING_TARGET_SPACES
         self._register_scalers()
+
 
     def _register_scalers(self):
         # scalers are used to support different sparse/quant granularity
@@ -449,3 +449,4 @@ def register_scalers(target_spaces: _PRUNING_TARGET_SPACES | _QUANTIZATION_TARGE
                 kernel_padding_mode = kernel_padding_mode if kernel_padding_mode else 'front'
                 kernel_padding_val = kernel_padding_val if kernel_padding_val else 1
                 target_space._scaler = Scaling(kernel_size, kernel_padding_mode, kernel_padding_val)  # type: ignore
+

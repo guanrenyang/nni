@@ -63,7 +63,7 @@ class BNNQuantizer(Quantizer):
         >>> config_list = [{'quant_types': ['weight', 'input'], 'quant_bits': {'weight': 8, 'input': 8}, 'op_types': ['Conv2d']}]
         >>> optimizer = ...
         >>> quantizer = BNNQuantizer(model, config_list, optimizer)
-        >>> quantizer.compress()
+        >>> quantizer.compress
         >>> # Training Process...
 
     For detailed example please refer to

@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     config_list = [{'op_types': ['Conv2d'], 'sparsity': 0.8}]
     pruner = L1NormPruner(model, config_list)
-    _, masks = pruner.compress()
+    _, masks = pruner.compress
 
     print('\nThe accuracy with masks:')
     evaluator(model)

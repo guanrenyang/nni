@@ -176,7 +176,7 @@ class AutoConvTestCase(unittest.TestCase):
         dummy_input = torch.rand(8, 1, 28, 28).to(device)
         config_list = [{'op_types': ['Conv2d'], 'sparsity': 0.5}]
         pruner = L1NormPruner(model=model, config_list=config_list)
-        pruned_model, masks = pruner.compress()
+        pruned_model, masks = pruner.compress
         pruner._unwrap_model()
         sparsity_list = compute_sparsity_mask2compact(pruned_model, masks, config_list)
         print('dummy_input.shape:', dummy_input.shape)

@@ -92,7 +92,7 @@ class InitMaskTestCase(unittest.TestCase):
 
         config_list = [{'op_types': ['Conv2d'], 'sparsity': 0.5}]
         pruner = L1NormPruner(model=model, config_list=config_list)
-        _, masks = pruner.compress()
+        _, masks = pruner.compress
         pruner.show_pruned_weights()
         pruner._unwrap_model()  # unwrap all modules to normal state
 

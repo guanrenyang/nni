@@ -8,7 +8,9 @@ from typing import Dict, List, Literal, Tuple, overload
 
 import torch
 
-from .tools import _DATA, _METRICS, _MASKS, active_sparse_targets_filter, norm_metrics, fpgm_metrics, generate_sparsity
+from nni.contrib.compression.pruning.tools import _DATA, _MASKS, _METRICS, _DYNAMIC_GRANULARITY_METRICS
+
+from .tools import _DATA, _METRICS, _DYNAMIC_GRANULARITY_METRICS, _MASKS, active_sparse_targets_filter, norm_metrics, fpgm_metrics, granularity_aware_metrics, generate_sparsity, granularity_aware_generate_sparsity
 from ..base.compressor import Compressor, Pruner
 from ..base.target_space import PruningTargetSpace
 from ..base.wrapper import ModuleWrapper
@@ -193,3 +195,33 @@ class FPGMPruner(_NormPruner):
 
     def _calculate_metrics(self, data: _DATA) -> _METRICS:
         return fpgm_metrics(p=self.p, data=data, target_spaces=self._target_spaces)
+
+class DynamicGranularityPruner(_NormPruner):
+    p = 2
+    granularities : Dict[str: Dict[str: int]] = {'layer4.0.conv2': {'weight': 16}, 'layer4.1.conv1': {'weight': 16},\
+                                                 'layer3.0.conv2': {'weight': 16}, 'layer1.0.conv1': {'weight': 16}, \
+                                                    'layer2.0.conv2': {'weight': 16}, 'layer2.1.conv1': {'weight': 16}, \
+                                                        'layer4.0.downsample.0': {'weight': 16}, 'layer3.1.conv1': {'weight': 16}, \
+                                                            'layer2.0.downsample.0': {'weight': 16}, 'layer4.0.conv1': {'weight': 16},
+                                                              'layer4.1.conv2': {'weight': 16}, 'layer1.1.conv2': {'weight': 16}, 
+                                                              'layer1.1.conv1': {'weight': 16}, 'layer1.0.conv2': {'weight': 16}, 
+                                                              'layer2.0.conv1': {'weight': 16}, 'layer3.1.conv2': {'weight': 16}, 'conv1': {'weight': 16}, 
+                                                              'layer3.0.conv1': {'weight': 16}, 'layer3.0.downsample.0': {'weight': 16}, 'layer2.1.conv2': {'weight': 16}}
+    granularity_list : Tuple = (16, 32, 64, 128, 256)
+
+    # def _set_per_layer_granularities(self):        
+    #     for module_name, module_target_spaces in self._target_spaces.items():
+    #         for target_name, _ in module_target_spaces.items():
+    def _set_granularities(self):
+        from ..utils import Scaling
+        for module_name, module_data in self.granularities.items():
+            for target_name, _ in module_data.items():
+                granularity = self.granularities[module_name][target_name]
+                self._target_spaces[module_name][module_data]._scaler = Scaling([granularity], 'front', 1)
+            
+    def _calculate_metrics(self, data: _DATA) -> _DYNAMIC_GRANULARITY_METRICS:
+        return granularity_aware_metrics(self.p, data, self._target_spaces)
+    
+    def _generate_sparsity(self, metrics: _DYNAMIC_GRANULARITY_METRICS) -> _MASKS:
+        return granularity_aware_generate_sparsity(metrics, self._target_spaces)
+    
